@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model Product {
+  id                Int              @id @default(autoincrement())
+  name              String
+  slug              String           @unique
+  description       String
+  priceInCents      Int
+  promoPriceInCents Int?
+  promoStartsAt     DateTime?
+  promoEndsAt       DateTime?
+  imageUrl          String
+  imageAlt          String?
+  category          String
+  sizes             String
+  colors            String
+  stock             Int              @default(0)
+  isActive          Boolean          @default(true)
+  isFeatured        Boolean          @default(false)
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  analyticsEvents   AnalyticsEvent[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model User {
+  id             String                 @id @default(cuid())
+  name           String?
+  email          String?                @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  authVersion    Int                    @default(0)
+  image          String?
+  phone          String?
+  accounts       Account[]
+  sessions       Session[]
+  authenticators Authenticator[]
+  cartItems      CartItem[]
+  orders         Order[]
+  notifications  CustomerNotification[]
+  authTokens     CustomerAuthToken[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, credentialID])
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  productId Int
+  size      String
+  color     String
+  quantity  Int      @default(1)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId, size, color])
+  @@index([userId])
+}
+
+model Order {
+  id                Int                    @id @default(autoincrement())
+  number            String                 @unique
+  userId            String
+  status            String                 @default("PENDING")
+  subtotalInCents   Int
+  shippingInCents   Int                    @default(0)
+  totalInCents      Int
+  customerName      String
+  customerEmail     String
+  phone             String
+  postalCode        String
+  addressLine       String
+  addressNumber     String
+  addressComplement String?
+  neighborhood      String
+  city              String
+  state             String
+  notes             String?
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items             OrderItem[]
+  statusEvents      OrderStatusEvent[]
+  notifications     CustomerNotification[]
+  analyticsEvents   AnalyticsEvent[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model OrderItem {
+  id               Int      @id @default(autoincrement())
+  orderId          Int
+  productId        Int?
+  productName      String
+  productSlug      String
+  imageUrl         String
+  size             String
+  color            String
+  quantity         Int
+  unitPriceInCents Int
+  totalInCents     Int
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+model OrderStatusEvent {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  status    String
+  title     String
+  message   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model CustomerNotification {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  orderId   Int?
+  type      String    @default("ORDER_STATUS")
+  title     String
+  message   String
+  readAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order     Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model AnalyticsEvent {
+  id           Int      @id @default(autoincrement())
+  type         String
+  visitorId    String
+  sessionId    String
+  userId       String?
+  path         String?
+  source       String?
+  medium       String?
+  campaign     String?
+  productId    Int?
+  orderId      Int?
+  valueInCents Int?
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order        Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([path, createdAt])
+  @@index([productId, createdAt])
+  @@index([orderId])
+}
+
+model CustomerAuthToken {
+  id                  Int      @id @default(autoincrement())
+  userId              String
+  type                String
+  tokenHash           String   @unique
+  pendingPasswordHash String?
+  expiresAt           DateTime
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+
+  @@index([userId, type, createdAt])
+  @@index([expiresAt])
+}

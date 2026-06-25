@@ -1,0 +1,2 @@
+ALTER TABLE "Product" ADD COLUMN "promoStartsAt" DATETIME;
+ALTER TABLE "Product" ADD COLUMN "promoEndsAt" DATETIME;

@@ -1,0 +1,43 @@
+{
+  "name": "lunafit",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "node --env-file=.env.local ./node_modules/prisma/build/index.js generate",
+    "db:init": "node --env-file=.env.local ./node_modules/prisma/build/index.js migrate deploy",
+    "db:push": "node --env-file=.env.local ./node_modules/prisma/build/index.js db push",
+    "db:import:postgres": "node --env-file=.env.local prisma/import-data.mjs",
+    "db:verify": "node --env-file=.env.local prisma/verify-data.mjs",
+    "db:seed:demo": "node --env-file=.env.local prisma/seed-demo.mjs",
+    "db:clear:demo": "node --env-file=.env.local prisma/clear-demo.mjs",
+    "db:studio": "node --env-file=.env.local ./node_modules/prisma/build/index.js studio",
+    "prisma": "prisma"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.2",
+    "@prisma/client": "6.19.3",
+    "@vercel/blob": "^2.4.1",
+    "lucide-react": "^1.21.0",
+    "next": "^16.2.9",
+    "next-auth": "^5.0.0-beta.31",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.5",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "10.4.19",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.9",
+    "postcss": "^8.5.15",
+    "prisma": "6.19.3",
+    "tailwindcss": "3.4.5",
+    "typescript": "5.6.3"
+  }
+}

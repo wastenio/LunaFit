@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS "Product" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "description" TEXT NOT NULL,
+  "priceInCents" INTEGER NOT NULL,
+  "promoPriceInCents" INTEGER,
+  "imageUrl" TEXT NOT NULL,
+  "imageAlt" TEXT,
+  "category" TEXT NOT NULL,
+  "sizes" TEXT NOT NULL,
+  "colors" TEXT NOT NULL,
+  "stock" INTEGER NOT NULL DEFAULT 0,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "isFeatured" BOOLEAN NOT NULL DEFAULT false,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Product_slug_key" ON "Product"("slug");
