@@ -8,6 +8,31 @@ type SendAuthEmailInput = {
   idempotencyKey: string;
 };
 
+type ResendErrorPayload = {
+  name?: unknown;
+  message?: unknown;
+  error?: unknown;
+};
+
+export class AuthEmailSendError extends Error {
+  status: number;
+  resendName?: string;
+  resendMessage?: string;
+
+  constructor(status: number, payload?: ResendErrorPayload | string) {
+    const details =
+      typeof payload === 'string'
+        ? payload
+        : getString(payload?.message) || getString(payload?.error) || undefined;
+
+    super(details ? `EMAIL_SEND_FAILED: ${details}` : 'EMAIL_SEND_FAILED');
+    this.name = 'AuthEmailSendError';
+    this.status = status;
+    this.resendName = typeof payload === 'string' ? undefined : getString(payload?.name);
+    this.resendMessage = details ? maskEmailAddresses(details) : undefined;
+  }
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -15,6 +40,42 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function getString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function maskEmailAddresses(value: string) {
+  return value.replace(
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
+    (email) => {
+      const [localPart, domain] = email.split('@');
+      const visible = localPart.slice(0, 2) || '**';
+
+      return `${visible}***@${domain}`;
+    }
+  );
+}
+
+function getEmailDomain(value: string) {
+  const match = value.match(/@([^>\s]+)/);
+
+  return match?.[1]?.toLowerCase() ?? 'unknown';
+}
+
+async function readResendError(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(text) as ResendErrorPayload;
+  } catch {
+    return maskEmailAddresses(text);
+  }
 }
 
 export function isCustomerEmailConfigured() {
@@ -33,6 +94,36 @@ export function getAuthActionUrl(path: string, token: string) {
   }
 
   return `${baseUrl}${path}?token=${encodeURIComponent(token)}`;
+}
+
+export function logAuthEmailError({
+  error,
+  operation,
+  to,
+}: {
+  error: unknown;
+  operation: string;
+  to: string;
+}) {
+  const from = process.env.EMAIL_FROM?.trim() ?? '';
+  const details =
+    error instanceof AuthEmailSendError
+      ? {
+          status: error.status,
+          resendName: error.resendName,
+          resendMessage: error.resendMessage,
+        }
+      : {
+          message: error instanceof Error ? maskEmailAddresses(error.message) : 'Unknown error',
+        };
+
+  console.error('[auth-email] send failed', {
+    operation,
+    provider: 'resend',
+    fromDomain: getEmailDomain(from),
+    recipientDomain: getEmailDomain(to),
+    ...details,
+  });
 }
 
 export async function sendAuthEmail(input: SendAuthEmailInput) {
@@ -78,6 +169,6 @@ export async function sendAuthEmail(input: SendAuthEmailInput) {
   });
 
   if (!response.ok) {
-    throw new Error('EMAIL_SEND_FAILED');
+    throw new AuthEmailSendError(response.status, await readResendError(response));
   }
 }

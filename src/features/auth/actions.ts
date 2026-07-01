@@ -12,6 +12,7 @@ import {
 import {
   getAuthActionUrl,
   isCustomerEmailConfigured,
+  logAuthEmailError,
   sendAuthEmail,
 } from './email';
 import { hashPassword, validatePassword } from './password';
@@ -185,7 +186,12 @@ export async function registerCustomerAction(formData: FormData) {
       actionUrl: getAuthActionUrl('/verificar-email', authToken.token),
       idempotencyKey: `verify-email-${authToken.tokenHash}`,
     });
-  } catch {
+  } catch (error) {
+    logAuthEmailError({
+      error,
+      operation: 'register-verification',
+      to: email,
+    });
     await prisma.customerAuthToken.deleteMany({
       where: { tokenHash: authToken.tokenHash },
     });
@@ -260,7 +266,12 @@ export async function requestEmailVerificationAction(formData: FormData) {
       actionUrl: getAuthActionUrl('/verificar-email', token.token),
       idempotencyKey: `verify-email-${token.tokenHash}`,
     });
-  } catch {
+  } catch (error) {
+    logAuthEmailError({
+      error,
+      operation: 'resend-verification',
+      to: email,
+    });
     await prisma.customerAuthToken.deleteMany({
       where: { tokenHash: token.tokenHash },
     });
@@ -355,7 +366,12 @@ export async function requestPasswordResetAction(formData: FormData) {
         actionUrl: getAuthActionUrl('/redefinir-senha', token.token),
         idempotencyKey: `password-reset-${token.tokenHash}`,
       });
-    } catch {
+    } catch (error) {
+      logAuthEmailError({
+        error,
+        operation: 'password-reset',
+        to: email,
+      });
       await prisma.customerAuthToken.deleteMany({
         where: { tokenHash: token.tokenHash },
       });
