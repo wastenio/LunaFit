@@ -2,6 +2,7 @@ import {
   InvalidWebhookSignatureError,
   MercadoPagoConfig,
   Payment,
+  PaymentRefund,
   Preference,
   WebhookSignatureValidator,
 } from 'mercadopago';
@@ -46,6 +47,7 @@ type PreferenceResponse = Awaited<ReturnType<Preference['create']>>;
 let mercadoPagoConfig: MercadoPagoConfig | null = null;
 let preferenceClient: Preference | null = null;
 let paymentClient: Payment | null = null;
+let paymentRefundClient: PaymentRefund | null = null;
 
 function getAccessToken() {
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim();
@@ -89,6 +91,14 @@ export function getMercadoPagoPaymentClient() {
   }
 
   return paymentClient;
+}
+
+export function getMercadoPagoPaymentRefundClient() {
+  if (!paymentRefundClient) {
+    paymentRefundClient = new PaymentRefund(getMercadoPagoConfig());
+  }
+
+  return paymentRefundClient;
 }
 
 function getAppBaseUrl(requestUrl: string) {
@@ -142,6 +152,32 @@ function isSandboxCredentials() {
   );
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+function getCheckoutPayerEmail(customerEmail: string) {
+  if (!isSandboxCredentials()) {
+    return customerEmail;
+  }
+
+  const testBuyerEmail = process.env.MERCADO_PAGO_TEST_BUYER_EMAIL?.trim();
+
+  if (!testBuyerEmail) {
+    throw new Error('MERCADO_PAGO_TEST_BUYER_EMAIL_REQUIRED');
+  }
+
+  if (!isValidEmail(testBuyerEmail)) {
+    throw new Error('MERCADO_PAGO_TEST_BUYER_EMAIL_INVALID');
+  }
+
+  if (testBuyerEmail.toLowerCase() === customerEmail.trim().toLowerCase()) {
+    throw new Error('MERCADO_PAGO_TEST_BUYER_EMAIL_EQUALS_CUSTOMER');
+  }
+
+  return testBuyerEmail;
+}
+
 export function getMercadoPagoCheckoutUrl(preference: PreferenceResponse) {
   if (isSandboxCredentials()) {
     return preference.sandbox_init_point || preference.init_point || null;
@@ -157,6 +193,7 @@ export async function createMercadoPagoCheckoutPreference({
 }: CreateCheckoutPreferenceInput) {
   const baseUrl = getAppBaseUrl(requestUrl);
   const customerName = splitName(order.customerName);
+  const payerEmail = getCheckoutPayerEmail(order.customerEmail);
   const preferenceBody: PreferenceBody = {
     auto_return: 'approved',
     back_urls: {
@@ -182,7 +219,7 @@ export async function createMercadoPagoCheckoutPreference({
     notification_url: `${baseUrl}/api/webhooks/mercadopago`,
     payer: {
       ...customerName,
-      email: order.customerEmail,
+      ...(payerEmail ? { email: payerEmail } : {}),
       phone: splitPhone(order.phone),
       address: {
         zip_code: order.postalCode.replace(/\D/g, ''),
@@ -209,6 +246,21 @@ export async function createMercadoPagoCheckoutPreference({
   };
 
   return getMercadoPagoPreferenceClient().create({ body: preferenceBody });
+}
+
+export async function refundMercadoPagoPayment({
+  orderNumber,
+  paymentId,
+}: {
+  orderNumber: string;
+  paymentId: string;
+}) {
+  return getMercadoPagoPaymentRefundClient().total({
+    payment_id: paymentId,
+    requestOptions: {
+      idempotencyKey: `lunafit-refund-${orderNumber}-${paymentId}`,
+    },
+  });
 }
 
 export function validateMercadoPagoWebhook({

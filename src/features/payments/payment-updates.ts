@@ -90,6 +90,12 @@ export async function applyMercadoPagoPaymentUpdate(payment: PaymentResponse) {
             ? (approvedAt ?? order.paymentApprovedAt ?? new Date())
             : order.paymentApprovedAt,
         paymentStatus,
+        paymentRefundedAt:
+          paymentStatus === 'REFUNDED'
+            ? (order.paymentRefundedAt ?? new Date())
+            : order.paymentRefundedAt,
+        paymentRefundUpdatedAt:
+          paymentStatus === 'REFUNDED' ? new Date() : order.paymentRefundUpdatedAt,
         paymentUpdatedAt: new Date(),
         status: shouldCancelOrder ? 'CANCELLED' : order.status,
       },

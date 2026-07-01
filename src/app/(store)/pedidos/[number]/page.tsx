@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, CircleX, Clock3 } from 'lucide-react';
 import { notFound, redirect } from 'next/navigation';
 import { formatCents } from '@/lib/money';
 import { getCustomerSession } from '@/lib/customer-auth';
+import { regenerateOrderPaymentLinkAction } from '@/features/orders/customer-actions';
 import { getOrderForUser } from '@/features/orders/order-data';
 import { getOrderStatusLabel } from '@/features/orders/order-status';
 import { getPaymentStatusLabel } from '@/features/payments/payment-status';
@@ -14,14 +15,39 @@ type OrderPageProps = {
   params: Promise<{
     number: string;
   }>;
+  searchParams: Promise<{
+    paymentLink?: string | string[];
+  }>;
 };
 
 export const metadata = {
   title: 'Pedido | LunaFit',
 };
 
-export default async function OrderPage({ params }: OrderPageProps) {
+function getPaymentLinkMessage(value?: string | string[]) {
+  const result = Array.isArray(value) ? value[0] : value;
+
+  switch (result) {
+    case 'failed':
+      return 'Nao foi possivel gerar um novo link de pagamento agora. Tente novamente em instantes.';
+    case 'not-configured':
+      return 'O pagamento online ainda nao esta configurado.';
+    case 'test-buyer-required':
+      return 'Configure o email da conta Comprador de teste do Mercado Pago para testar o pagamento.';
+    case 'test-buyer-invalid':
+      return 'Informe o email completo da conta Comprador de teste do Mercado Pago. Nao use apenas o usuario/login.';
+    case 'test-buyer-equals-customer':
+      return 'No Sandbox do Mercado Pago, o comprador de teste precisa ser diferente da conta usada no site.';
+    case 'closed':
+      return 'Este pedido nao pode mais gerar um novo link de pagamento.';
+    default:
+      return null;
+  }
+}
+
+export default async function OrderPage({ params, searchParams }: OrderPageProps) {
   const { number } = await params;
+  const resolvedSearchParams = await searchParams;
   const session = await getCustomerSession();
 
   if (!session) {
@@ -38,6 +64,9 @@ export default async function OrderPage({ params }: OrderPageProps) {
   const isPaymentApproved = order.paymentStatus === 'APPROVED';
   const isPending = order.status === 'PENDING' || !isPaymentApproved;
   const isCompleted = order.status === 'COMPLETED';
+  const canGeneratePaymentLink = !isCancelled && !isCompleted && !isPaymentApproved;
+  const regeneratePaymentLink = regenerateOrderPaymentLinkAction.bind(null, order.number);
+  const paymentLinkMessage = getPaymentLinkMessage(resolvedSearchParams.paymentLink);
   const statusTheme = isCancelled
     ? {
         border: 'border-red-200 bg-red-50',
@@ -66,6 +95,11 @@ export default async function OrderPage({ params }: OrderPageProps) {
           {getPaymentStatusLabel(order.paymentStatus)} - {getOrderStatusLabel(order.status)}
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-zinc-950">{order.number}</h1>
+        {paymentLinkMessage ? (
+          <p className="mt-4 max-w-2xl border border-red-200 bg-white px-4 py-3 text-sm text-red-700">
+            {paymentLinkMessage}
+          </p>
+        ) : null}
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
           {isCancelled
             ? 'Este pedido foi cancelado. Entre em contato com a LunaFit caso precise de ajuda.'
@@ -77,13 +111,15 @@ export default async function OrderPage({ params }: OrderPageProps) {
                 ? 'Seu pedido foi concluido. Obrigado por comprar com a LunaFit.'
                 : 'Seu pedido esta em andamento. Acompanhe abaixo cada atualizacao registrada pela equipe LunaFit.'}
         </p>
-        {!isCancelled && !isPaymentApproved && order.paymentInitPoint ? (
-          <Link
-            href={order.paymentInitPoint}
-            className="mt-6 inline-flex rounded-md bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
-          >
-            Concluir pagamento
-          </Link>
+        {canGeneratePaymentLink ? (
+          <form action={regeneratePaymentLink}>
+            <button
+              type="submit"
+              className="mt-6 inline-flex rounded-md bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Concluir pagamento
+            </button>
+          </form>
         ) : null}
       </section>
 
@@ -169,13 +205,15 @@ export default async function OrderPage({ params }: OrderPageProps) {
             <br />
             Mercado Pago
           </p>
-          {!isCancelled && !isPaymentApproved && order.paymentInitPoint ? (
-            <Link
-              href={order.paymentInitPoint}
-              className="mt-4 inline-flex rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:border-rose-600 hover:text-rose-700"
-            >
-              Abrir pagamento
-            </Link>
+          {canGeneratePaymentLink ? (
+            <form action={regeneratePaymentLink}>
+              <button
+                type="submit"
+                className="mt-4 inline-flex rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:border-rose-600 hover:text-rose-700"
+              >
+                Abrir pagamento
+              </button>
+            </form>
           ) : null}
 
           <div className="mt-6 border-t border-zinc-200 pt-6">

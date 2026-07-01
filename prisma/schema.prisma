@@ -127,8 +127,13 @@ model Order {
   paymentInitPoint           String?
   mercadoPagoPaymentId       String?
   mercadoPagoMerchantOrderId String?
+  paymentRefundId            String?
+  paymentRefundStatus        String?
+  paymentRefundAmountInCents Int?
   paymentApprovedAt          DateTime?
   paymentUpdatedAt           DateTime?
+  paymentRefundedAt          DateTime?
+  paymentRefundUpdatedAt     DateTime?
   subtotalInCents            Int
   shippingInCents            Int                    @default(0)
   totalInCents               Int
@@ -154,6 +159,7 @@ model Order {
   @@index([userId, createdAt])
   @@index([paymentStatus, createdAt])
   @@index([mercadoPagoPaymentId])
+  @@index([paymentRefundId])
 }
 
 model OrderItem {

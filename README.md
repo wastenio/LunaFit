@@ -129,6 +129,7 @@ Configure na Vercel e no `.env.local`:
 ```bash
 MERCADO_PAGO_ACCESS_TOKEN=""
 MERCADO_PAGO_WEBHOOK_SECRET=""
+MERCADO_PAGO_TEST_BUYER_EMAIL=""
 NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=""
 NEXT_PUBLIC_APP_URL="https://lunafit-azure.vercel.app"
 ```
@@ -142,6 +143,18 @@ https://lunafit-azure.vercel.app/api/webhooks/mercadopago
 Use credenciais de teste primeiro. Em producao, troque as variaveis por credenciais
 produtivas e mantenha `MERCADO_PAGO_ACCESS_TOKEN` e `MERCADO_PAGO_WEBHOOK_SECRET`
 como variaveis confidenciais.
+
+Para testar em Sandbox, use a credencial de uma conta Vendedor de teste no
+`MERCADO_PAGO_ACCESS_TOKEN` e informe em `MERCADO_PAGO_TEST_BUYER_EMAIL` o e-mail
+da conta Comprador de teste criada no Mercado Pago. O comprador de teste precisa
+ser diferente do vendedor das credenciais e diferente da conta usada para entrar
+no site durante o teste. Use o e-mail completo da conta de teste, nao apenas o
+usuario/login, e nao use seu e-mail real nessa variavel.
+
+No painel admin, pedidos com pagamento aprovado e ID do Mercado Pago podem ser
+reembolsados. O reembolso solicita o estorno total pela API do Mercado Pago,
+atualiza o status financeiro, cancela o pedido quando ele ainda nao foi concluido,
+devolve o estoque e notifica o cliente.
 
 ## Catalogo de demonstracao
 

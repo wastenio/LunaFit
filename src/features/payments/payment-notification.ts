@@ -30,6 +30,10 @@ export function getPaymentNotification(
       title: 'Pagamento cancelado',
       message: `O pagamento do pedido ${orderNumber} foi cancelado.`,
     },
+    REFUND_IN_PROCESS: {
+      title: 'Reembolso em processamento',
+      message: `O reembolso do pedido ${orderNumber} foi solicitado e esta em processamento pelo Mercado Pago.`,
+    },
     REFUNDED: {
       title: 'Pagamento estornado',
       message: `O pagamento do pedido ${orderNumber} foi estornado. Entre em contato se precisar de ajuda.`,

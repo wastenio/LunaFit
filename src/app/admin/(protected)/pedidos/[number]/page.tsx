@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { CircleCheck } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { formatCents } from '@/lib/money';
-import { updateOrderStatusAction } from '@/features/orders/actions';
+import {
+  refundOrderPaymentAction,
+  updateOrderStatusAction,
+} from '@/features/orders/actions';
 import { getOrderForAdmin } from '@/features/orders/order-data';
 import {
   getAvailableOrderStatuses,
@@ -17,10 +20,58 @@ type AdminOrderPageProps = {
   params: Promise<{
     number: string;
   }>;
+  searchParams: Promise<{
+    refund?: string | string[];
+  }>;
 };
 
-export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
+function getRefundMessage(value?: string | string[]) {
+  const result = Array.isArray(value) ? value[0] : value;
+
+  switch (result) {
+    case 'success':
+      return {
+        tone: 'success',
+        text: 'Reembolso solicitado ao Mercado Pago e pedido atualizado.',
+      };
+    case 'already-refunded':
+      return {
+        tone: 'info',
+        text: 'Este pedido ja possui reembolso registrado ou em processamento.',
+      };
+    case 'missing-payment':
+      return {
+        tone: 'error',
+        text: 'Nao ha ID de pagamento do Mercado Pago para reembolsar este pedido.',
+      };
+    case 'missing-confirmation':
+      return {
+        tone: 'error',
+        text: 'Confirme a autorizacao antes de solicitar o reembolso.',
+      };
+    case 'not-approved':
+      return {
+        tone: 'error',
+        text: 'Somente pagamentos aprovados podem ser reembolsados pelo admin.',
+      };
+    case 'completed':
+      return {
+        tone: 'error',
+        text: 'Pedidos concluidos nao podem ser cancelados por este fluxo de reembolso.',
+      };
+    case 'failed':
+      return {
+        tone: 'error',
+        text: 'Nao foi possivel solicitar o reembolso agora. Confira o Mercado Pago e tente novamente.',
+      };
+    default:
+      return null;
+  }
+}
+
+export default async function AdminOrderPage({ params, searchParams }: AdminOrderPageProps) {
   const { number } = await params;
+  const resolvedSearchParams = await searchParams;
   const order = await getOrderForAdmin(number);
 
   if (!order) {
@@ -28,14 +79,33 @@ export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
   }
 
   const updateStatus = updateOrderStatusAction.bind(null, order.number);
+  const refundPayment = refundOrderPaymentAction.bind(null, order.number);
   const availableStatuses = getAvailableOrderStatuses(order.status);
   const isTerminal = availableStatuses.length === 1;
+  const isPaymentRefundable =
+    order.status !== 'COMPLETED' &&
+    order.paymentStatus === 'APPROVED' &&
+    Boolean(order.mercadoPagoPaymentId);
+  const refundMessage = getRefundMessage(resolvedSearchParams.refund);
 
   return (
     <section>
       <Link href="/admin/pedidos" className="text-sm font-semibold text-rose-300 hover:text-white">
         Voltar para pedidos
       </Link>
+      {refundMessage ? (
+        <div
+          className={`mt-5 border px-4 py-3 text-sm ${
+            refundMessage.tone === 'success'
+              ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'
+              : refundMessage.tone === 'info'
+                ? 'border-sky-400/30 bg-sky-400/10 text-sky-100'
+                : 'border-rose-400/30 bg-rose-400/10 text-rose-100'
+          }`}
+        >
+          {refundMessage.text}
+        </div>
+      ) : null}
       <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rose-300">
@@ -120,6 +190,50 @@ export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
             >
               Abrir checkout
             </Link>
+          ) : null}
+          {order.paymentRefundId || order.paymentRefundStatus ? (
+            <p className="mt-4 border-t border-white/10 pt-4 text-sm leading-6 text-zinc-300">
+              Reembolso
+              {order.paymentRefundId ? (
+                <>
+                  <br />
+                  ID: {order.paymentRefundId}
+                </>
+              ) : null}
+              {order.paymentRefundStatus ? (
+                <>
+                  <br />
+                  Status MP: {order.paymentRefundStatus}
+                </>
+              ) : null}
+              {order.paymentRefundAmountInCents !== null ? (
+                <>
+                  <br />
+                  Valor: {formatCents(order.paymentRefundAmountInCents)}
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {isPaymentRefundable ? (
+            <form action={refundPayment} className="mt-5 border-t border-white/10 pt-5">
+              <label className="flex gap-3 text-sm leading-5 text-zinc-300">
+                <input
+                  name="confirmRefund"
+                  type="checkbox"
+                  value="yes"
+                  required
+                  className="mt-1 h-4 w-4 accent-rose-500"
+                />
+                Confirmo que desejo solicitar o reembolso total no Mercado Pago e cancelar ou
+                manter cancelado o pedido no sistema.
+              </label>
+              <button
+                type="submit"
+                className="mt-4 w-full rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500"
+              >
+                Reembolsar e cancelar
+              </button>
+            </form>
           ) : null}
 
           <div className="mt-6 border-t border-white/10 pt-6">

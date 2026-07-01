@@ -217,6 +217,40 @@ export async function POST(request: Request) {
         orderNumber: createdOrder.number,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+
+      if (
+        error instanceof Error &&
+        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_REQUIRED'
+      ) {
+        return NextResponse.json(
+          { error: 'Configure o email da conta Comprador de teste do Mercado Pago.' },
+          { status: 503 }
+        );
+      }
+
+      if (
+        error instanceof Error &&
+        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_INVALID'
+      ) {
+        return NextResponse.json(
+          { error: 'Informe um email valido da conta Comprador de teste do Mercado Pago.' },
+          { status: 503 }
+        );
+      }
+
+      if (
+        error instanceof Error &&
+        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_EQUALS_CUSTOMER'
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'No Sandbox do Mercado Pago, o comprador de teste deve ser diferente da conta usada no site.',
+          },
+          { status: 503 }
+        );
+      }
+
       return NextResponse.json(
         { error: 'Nao foi possivel iniciar o pagamento agora. Tente novamente.' },
         { status: 502 }

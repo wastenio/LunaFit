@@ -4,6 +4,7 @@ export const paymentStatuses = [
   'APPROVED',
   'REJECTED',
   'CANCELLED',
+  'REFUND_IN_PROCESS',
   'REFUNDED',
   'CHARGED_BACK',
   'UNKNOWN',
@@ -17,6 +18,7 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
   APPROVED: 'Pagamento aprovado',
   REJECTED: 'Pagamento recusado',
   CANCELLED: 'Pagamento cancelado',
+  REFUND_IN_PROCESS: 'Reembolso em processamento',
   REFUNDED: 'Pagamento estornado',
   CHARGED_BACK: 'Pagamento contestado',
   UNKNOWN: 'Pagamento atualizado',
@@ -52,5 +54,9 @@ export function mapMercadoPagoStatus(status?: string | null): PaymentStatus {
 }
 
 export function shouldCancelUnprocessedOrderForPayment(status: PaymentStatus) {
-  return status === 'REJECTED' || status === 'CANCELLED';
+  return status === 'REJECTED' || status === 'CANCELLED' || status === 'REFUNDED';
+}
+
+export function mapMercadoPagoRefundStatus(status?: string | null): PaymentStatus {
+  return status === 'approved' ? 'REFUNDED' : 'REFUND_IN_PROCESS';
 }
