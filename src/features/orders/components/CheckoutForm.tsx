@@ -41,7 +41,7 @@ export function CheckoutForm({
         body: JSON.stringify(body),
       });
       const data = (await response.json().catch(() => null)) as
-        | { number?: string; error?: string }
+        | { checkoutUrl?: string; number?: string; error?: string }
         | null;
 
       if (!response.ok || !data?.number) {
@@ -49,8 +49,12 @@ export function CheckoutForm({
         return;
       }
 
+      if (data.checkoutUrl) {
+        window.location.assign(data.checkoutUrl);
+        return;
+      }
+
       router.push(`/pedidos/${data.number}`);
-      router.refresh();
     } catch {
       setError('Nao foi possivel conectar ao servidor.');
     } finally {
@@ -157,7 +161,8 @@ export function CheckoutForm({
           </span>
         </div>
         <p className="mt-3 text-xs leading-5 text-zinc-500">
-          Frete e pagamento serao combinados apos o envio do pedido.
+          O pagamento sera realizado no ambiente seguro do Mercado Pago. O valor atual cobre os
+          produtos do carrinho.
         </p>
         <button
           type="submit"
@@ -165,11 +170,11 @@ export function CheckoutForm({
           className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? (
-            'Finalizando...'
+            'Abrindo pagamento...'
           ) : (
             <>
               <CheckCircle2 aria-hidden="true" className="h-5 w-5" />
-              Confirmar pedido
+              Ir para pagamento
             </>
           )}
         </button>

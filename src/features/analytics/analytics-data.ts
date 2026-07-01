@@ -100,6 +100,7 @@ export async function getAnalyticsDashboard(period: AnalyticsPeriod) {
     }),
     prisma.order.findMany({
       select: {
+        paymentStatus: true,
         userId: true,
         status: true,
         totalInCents: true,
@@ -116,10 +117,16 @@ export async function getAnalyticsDashboard(period: AnalyticsPeriod) {
   const currentPageViews = currentEvents.filter((event) => event.type === 'PAGE_VIEW');
   const previousPageViews = previousEvents.filter((event) => event.type === 'PAGE_VIEW');
   const currentOrders = orders.filter(
-    (order) => order.createdAt >= currentStart && order.status !== 'CANCELLED'
+    (order) =>
+      order.createdAt >= currentStart &&
+      order.status !== 'CANCELLED' &&
+      order.paymentStatus === 'APPROVED'
   );
   const previousOrders = orders.filter(
-    (order) => order.createdAt < currentStart && order.status !== 'CANCELLED'
+    (order) =>
+      order.createdAt < currentStart &&
+      order.status !== 'CANCELLED' &&
+      order.paymentStatus === 'APPROVED'
   );
   const pageViews = currentPageViews.length;
   const previousPageViewCount = previousPageViews.length;

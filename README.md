@@ -16,6 +16,7 @@ Producao: <https://lunafit-azure.vercel.app>
 - Vercel Blob para imagens de produtos
 - Auth.js, Google OAuth e autenticacao por email/senha
 - Resend para emails transacionais
+- Mercado Pago Checkout Pro para pagamentos online
 
 ## Estrutura
 
@@ -52,6 +53,10 @@ AUTH_GOOGLE_SECRET="client-secret-do-google"
 AUTH_URL="http://127.0.0.1:3210"
 RESEND_API_KEY="re_sua_chave_do_resend"
 EMAIL_FROM="LunaFit <contato@seudominio.com>"
+MERCADO_PAGO_ACCESS_TOKEN="access-token-do-mercado-pago"
+MERCADO_PAGO_WEBHOOK_SECRET="assinatura-secreta-do-webhook"
+NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY="public-key-do-mercado-pago"
+NEXT_PUBLIC_APP_URL="https://lunafit-azure.vercel.app"
 NEXT_PUBLIC_STORE_NAME="LunaFit"
 NEXT_PUBLIC_STORE_INSTAGRAM_URL="https://instagram.com/sua-loja"
 NEXT_PUBLIC_STORE_WHATSAPP_NUMBER="5585999999999"
@@ -110,8 +115,33 @@ unico, valido por 30 minutos.
 Em desenvolvimento, o remetente de testes do Resend pode ter restricoes de destinatario. Para
 clientes reais, use um dominio verificado.
 
-Os pedidos sao gravados no PostgreSQL, baixam o estoque e geram notificacoes a
-cada mudanca de status. Pagamento e calculo de frete sao as proximas integracoes.
+Os pedidos sao gravados no PostgreSQL, reservam estoque e geram notificacoes a
+cada mudanca de status operacional ou financeiro.
+
+### Pagamentos Mercado Pago
+
+O checkout usa Mercado Pago Checkout Pro. O cliente finaliza os dados de entrega,
+o pedido e reservado no banco e ele e redirecionado para o ambiente seguro do Mercado
+Pago. O webhook atualiza o status financeiro do pedido automaticamente.
+
+Configure na Vercel e no `.env.local`:
+
+```bash
+MERCADO_PAGO_ACCESS_TOKEN=""
+MERCADO_PAGO_WEBHOOK_SECRET=""
+NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=""
+NEXT_PUBLIC_APP_URL="https://lunafit-azure.vercel.app"
+```
+
+URL do webhook:
+
+```text
+https://lunafit-azure.vercel.app/api/webhooks/mercadopago
+```
+
+Use credenciais de teste primeiro. Em producao, troque as variaveis por credenciais
+produtivas e mantenha `MERCADO_PAGO_ACCESS_TOKEN` e `MERCADO_PAGO_WEBHOOK_SECRET`
+como variaveis confidenciais.
 
 ## Catalogo de demonstracao
 

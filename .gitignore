@@ -14,5 +14,4 @@ prisma/backups/
 
 .vercel
 .env*
-
-.env*
+!.env.example

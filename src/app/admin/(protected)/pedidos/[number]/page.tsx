@@ -9,6 +9,7 @@ import {
   getAvailableOrderStatuses,
   orderStatusLabels,
 } from '@/features/orders/order-status';
+import { getPaymentStatusLabel } from '@/features/payments/payment-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,28 @@ export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
         </div>
 
         <aside className="h-fit border border-white/10 bg-white/[0.04] p-6">
+          <p className="text-sm font-semibold text-white">Pagamento</p>
+          <p className="mt-3 text-sm leading-6 text-zinc-300">
+            {getPaymentStatusLabel(order.paymentStatus)}
+            <br />
+            Mercado Pago
+            {order.mercadoPagoPaymentId ? (
+              <>
+                <br />
+                ID: {order.mercadoPagoPaymentId}
+              </>
+            ) : null}
+          </p>
+          {order.paymentInitPoint ? (
+            <Link
+              href={order.paymentInitPoint}
+              className="mt-3 inline-flex text-sm font-semibold text-rose-300 hover:text-white"
+            >
+              Abrir checkout
+            </Link>
+          ) : null}
+
+          <div className="mt-6 border-t border-white/10 pt-6">
           <p className="text-sm font-semibold text-white">Cliente e entrega</p>
           <p className="mt-4 text-sm leading-6 text-zinc-300">
             {order.customerName}
@@ -123,6 +146,7 @@ export default async function AdminOrderPage({ params }: AdminOrderPageProps) {
               Observacao: {order.notes}
             </p>
           ) : null}
+          </div>
           <div className="mt-5 flex justify-between border-t border-white/10 pt-5">
             <span className="font-semibold text-white">Total</span>
             <span className="font-semibold text-white">{formatCents(order.totalInCents)}</span>

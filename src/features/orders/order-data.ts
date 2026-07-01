@@ -7,6 +7,7 @@ export async function listOrdersForUser(userId: string) {
     select: {
       id: true,
       number: true,
+      paymentStatus: true,
       status: true,
       totalInCents: true,
       createdAt: true,
@@ -40,6 +41,7 @@ export async function listOrdersForAdmin() {
       id: true,
       number: true,
       status: true,
+      paymentStatus: true,
       customerName: true,
       customerEmail: true,
       phone: true,
@@ -67,6 +69,7 @@ export async function getOrderForAdmin(number: string) {
 export async function countOrdersAwaitingAction() {
   return getPrisma().order.count({
     where: {
+      paymentStatus: 'APPROVED',
       status: {
         in: orderStatusesAwaitingAction,
       },

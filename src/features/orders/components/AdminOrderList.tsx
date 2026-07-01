@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { formatCents } from '@/lib/money';
+import { getPaymentStatusLabel } from '@/features/payments/payment-status';
 import { updateOrderStatusAction } from '../actions';
 import type { listOrdersForAdmin } from '../order-data';
 import { getAvailableOrderStatuses, orderStatusLabels } from '../order-status';
@@ -54,6 +55,9 @@ export function AdminOrderList({ orders }: AdminOrderListProps) {
               <p className="mt-2">
                 {order._count.items} {order._count.items === 1 ? 'item' : 'itens'} -{' '}
                 <span className="font-semibold text-white">{formatCents(order.totalInCents)}</span>
+              </p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-rose-200">
+                {getPaymentStatusLabel(order.paymentStatus)}
               </p>
             </div>
             <form action={updateStatus} className="flex items-center gap-2">

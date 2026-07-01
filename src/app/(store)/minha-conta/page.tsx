@@ -5,6 +5,7 @@ import { formatCents } from '@/lib/money';
 import { getCustomerSession } from '@/lib/customer-auth';
 import { listOrdersForUser } from '@/features/orders/order-data';
 import { getOrderStatusLabel } from '@/features/orders/order-status';
+import { getPaymentStatusLabel } from '@/features/payments/payment-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,7 @@ export default async function CustomerAccountPage() {
                   </p>
                 </div>
                 <span className="text-sm text-zinc-600">
+                  {getPaymentStatusLabel(order.paymentStatus)} -{' '}
                   {getOrderStatusLabel(order.status)} - {order._count.items}{' '}
                   {order._count.items === 1 ? 'produto' : 'produtos'}
                 </span>

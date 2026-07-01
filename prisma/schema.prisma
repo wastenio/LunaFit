@@ -117,33 +117,43 @@ model CartItem {
 }
 
 model Order {
-  id                Int                    @id @default(autoincrement())
-  number            String                 @unique
-  userId            String
-  status            String                 @default("PENDING")
-  subtotalInCents   Int
-  shippingInCents   Int                    @default(0)
-  totalInCents      Int
-  customerName      String
-  customerEmail     String
-  phone             String
-  postalCode        String
-  addressLine       String
-  addressNumber     String
-  addressComplement String?
-  neighborhood      String
-  city              String
-  state             String
-  notes             String?
-  user              User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
-  items             OrderItem[]
-  statusEvents      OrderStatusEvent[]
-  notifications     CustomerNotification[]
-  analyticsEvents   AnalyticsEvent[]
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  id                         Int                    @id @default(autoincrement())
+  number                     String                 @unique
+  userId                     String
+  status                     String                 @default("PENDING")
+  paymentProvider            String                 @default("MERCADO_PAGO")
+  paymentStatus              String                 @default("PENDING")
+  paymentPreferenceId        String?                @unique
+  paymentInitPoint           String?
+  mercadoPagoPaymentId       String?
+  mercadoPagoMerchantOrderId String?
+  paymentApprovedAt          DateTime?
+  paymentUpdatedAt           DateTime?
+  subtotalInCents            Int
+  shippingInCents            Int                    @default(0)
+  totalInCents               Int
+  customerName               String
+  customerEmail              String
+  phone                      String
+  postalCode                 String
+  addressLine                String
+  addressNumber              String
+  addressComplement          String?
+  neighborhood               String
+  city                       String
+  state                      String
+  notes                      String?
+  user                       User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items                      OrderItem[]
+  statusEvents               OrderStatusEvent[]
+  notifications              CustomerNotification[]
+  analyticsEvents            AnalyticsEvent[]
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
 
   @@index([userId, createdAt])
+  @@index([paymentStatus, createdAt])
+  @@index([mercadoPagoPaymentId])
 }
 
 model OrderItem {

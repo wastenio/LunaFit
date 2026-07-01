@@ -36,8 +36,8 @@ export default async function CheckoutPage() {
       </p>
       <h1 className="mt-3 text-4xl font-semibold text-zinc-950">Finalizar pedido</h1>
       <p className="mt-3 text-sm leading-6 text-zinc-600">
-        Informe os dados para entrega. O pedido sera registrado e a loja entrara em contato para
-        confirmar frete e pagamento.
+        Informe os dados para entrega. Em seguida, voce sera direcionada ao Mercado Pago para
+        pagar com cartao, Pix ou outro meio disponivel.
       </p>
 
       <div className="mt-9">

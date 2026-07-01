@@ -1,15 +1,46 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getCustomerSession } from '@/lib/customer-auth';
+import {
+  createMercadoPagoCheckoutPreference,
+  getMercadoPagoCheckoutUrl,
+  isMercadoPagoConfigured,
+} from '@/lib/mercado-pago';
 import { getPrisma } from '@/lib/prisma';
 import { readAnalyticsIdentity } from '@/features/analytics/analytics-server';
-import { getOrderNotification } from '@/features/orders/order-notification';
 import { parseCheckoutInput } from '@/features/orders/order-schema';
+import { getPaymentNotification } from '@/features/payments/payment-notification';
 import { getCurrentPriceInCents } from '@/features/products/product-promotion';
 
 function createOrderNumber() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `LF-${date}-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+async function releaseOrderReservation(number: string) {
+  const prisma = getPrisma();
+
+  await prisma.$transaction(async (transaction) => {
+    const order = await transaction.order.findUnique({
+      include: { items: true },
+      where: { number },
+    });
+
+    if (!order) {
+      return;
+    }
+
+    for (const item of order.items) {
+      if (item.productId) {
+        await transaction.product.updateMany({
+          data: { stock: { increment: item.quantity } },
+          where: { id: item.productId },
+        });
+      }
+    }
+
+    await transaction.order.delete({ where: { id: order.id } });
+  });
 }
 
 export async function POST(request: Request) {
@@ -32,10 +63,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
+  if (!isMercadoPagoConfigured()) {
+    return NextResponse.json(
+      { error: 'O pagamento online ainda nao esta configurado.' },
+      { status: 503 }
+    );
+  }
+
   const prisma = getPrisma();
 
   try {
-    const order = await prisma.$transaction(async (transaction) => {
+    const createdOrder = await prisma.$transaction(async (transaction) => {
       const user = await transaction.user.findUnique({
         select: { email: true },
         where: { id: session.user.id },
@@ -96,6 +134,8 @@ export async function POST(request: Request) {
           status: 'PENDING',
           userId: session.user.id,
           customerEmail: user.email,
+          paymentProvider: 'MERCADO_PAGO',
+          paymentStatus: 'PENDING',
           subtotalInCents,
           shippingInCents: 0,
           totalInCents: subtotalInCents,
@@ -103,14 +143,16 @@ export async function POST(request: Request) {
             create: items,
           },
         },
-        select: { id: true, number: true },
+        include: {
+          items: true,
+        },
       });
-      const notification = getOrderNotification('PENDING', createdOrder.number);
+      const notification = getPaymentNotification('PENDING', createdOrder.number);
 
       await transaction.orderStatusEvent.create({
         data: {
           orderId: createdOrder.id,
-          status: 'PENDING',
+          status: 'PAYMENT_PENDING',
           ...notification,
         },
       });
@@ -124,7 +166,7 @@ export async function POST(request: Request) {
       if (analyticsIdentity) {
         await transaction.analyticsEvent.create({
           data: {
-            type: 'PURCHASE',
+            type: 'CHECKOUT_STARTED',
             visitorId: analyticsIdentity.visitorId,
             sessionId: analyticsIdentity.sessionId,
             userId: session.user.id,
@@ -139,14 +181,52 @@ export async function POST(request: Request) {
         data: { phone: parsed.data.phone },
         where: { id: session.user.id },
       });
-      await transaction.cartItem.deleteMany({
-        where: { userId: session.user.id },
-      });
 
-      return { number: createdOrder.number };
+      return createdOrder;
     });
 
-    return NextResponse.json(order, { status: 201 });
+    let checkoutUrl = '';
+
+    try {
+      const preference = await createMercadoPagoCheckoutPreference({
+        order: createdOrder,
+        items: createdOrder.items,
+        requestUrl: request.url,
+      });
+      checkoutUrl = getMercadoPagoCheckoutUrl(preference) || '';
+
+      if (!preference.id || !checkoutUrl) {
+        throw new Error('PREFERENCE_WITHOUT_CHECKOUT_URL');
+      }
+
+      await prisma.$transaction([
+        prisma.order.update({
+          data: {
+            paymentInitPoint: checkoutUrl,
+            paymentPreferenceId: preference.id,
+          },
+          where: { id: createdOrder.id },
+        }),
+        prisma.cartItem.deleteMany({
+          where: { userId: session.user.id },
+        }),
+      ]);
+    } catch (error) {
+      await releaseOrderReservation(createdOrder.number);
+      console.error('[mercado-pago] checkout preference failed', {
+        orderNumber: createdOrder.number,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return NextResponse.json(
+        { error: 'Nao foi possivel iniciar o pagamento agora. Tente novamente.' },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json(
+      { number: createdOrder.number, checkoutUrl },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === 'EMPTY') {

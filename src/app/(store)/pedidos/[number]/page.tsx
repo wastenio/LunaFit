@@ -6,6 +6,7 @@ import { formatCents } from '@/lib/money';
 import { getCustomerSession } from '@/lib/customer-auth';
 import { getOrderForUser } from '@/features/orders/order-data';
 import { getOrderStatusLabel } from '@/features/orders/order-status';
+import { getPaymentStatusLabel } from '@/features/payments/payment-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,8 @@ export default async function OrderPage({ params }: OrderPageProps) {
   }
 
   const isCancelled = order.status === 'CANCELLED';
-  const isPending = order.status === 'PENDING';
+  const isPaymentApproved = order.paymentStatus === 'APPROVED';
+  const isPending = order.status === 'PENDING' || !isPaymentApproved;
   const isCompleted = order.status === 'COMPLETED';
   const statusTheme = isCancelled
     ? {
@@ -61,18 +63,28 @@ export default async function OrderPage({ params }: OrderPageProps) {
         <p
           className={`mt-5 text-xs font-semibold uppercase tracking-[0.2em] ${statusTheme.text}`}
         >
-          {getOrderStatusLabel(order.status)}
+          {getPaymentStatusLabel(order.paymentStatus)} - {getOrderStatusLabel(order.status)}
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-zinc-950">{order.number}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
           {isCancelled
             ? 'Este pedido foi cancelado. Entre em contato com a LunaFit caso precise de ajuda.'
-            : isPending
-              ? 'Seu pedido foi enviado e aguarda o recebimento da equipe LunaFit.'
+            : !isPaymentApproved
+              ? 'Seu pedido foi reservado e aguarda a confirmacao de pagamento pelo Mercado Pago.'
+              : isPending
+                ? 'Pagamento aprovado. Seu pedido aguarda o recebimento da equipe LunaFit.'
               : isCompleted
                 ? 'Seu pedido foi concluido. Obrigado por comprar com a LunaFit.'
                 : 'Seu pedido esta em andamento. Acompanhe abaixo cada atualizacao registrada pela equipe LunaFit.'}
         </p>
+        {!isCancelled && !isPaymentApproved && order.paymentInitPoint ? (
+          <Link
+            href={order.paymentInitPoint}
+            className="mt-6 inline-flex rounded-md bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+          >
+            Concluir pagamento
+          </Link>
+        ) : null}
       </section>
 
       <section className="mt-8 border-y border-zinc-200 py-7">
@@ -151,6 +163,22 @@ export default async function OrderPage({ params }: OrderPageProps) {
         </section>
 
         <aside className="h-fit border border-zinc-200 bg-zinc-50 p-6">
+          <h2 className="font-semibold text-zinc-950">Pagamento</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-600">
+            {getPaymentStatusLabel(order.paymentStatus)}
+            <br />
+            Mercado Pago
+          </p>
+          {!isCancelled && !isPaymentApproved && order.paymentInitPoint ? (
+            <Link
+              href={order.paymentInitPoint}
+              className="mt-4 inline-flex rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:border-rose-600 hover:text-rose-700"
+            >
+              Abrir pagamento
+            </Link>
+          ) : null}
+
+          <div className="mt-6 border-t border-zinc-200 pt-6">
           <h2 className="font-semibold text-zinc-950">Entrega</h2>
           <p className="mt-3 text-sm leading-6 text-zinc-600">
             {order.customerName}
@@ -164,6 +192,7 @@ export default async function OrderPage({ params }: OrderPageProps) {
             <br />
             CEP {order.postalCode}
           </p>
+          </div>
           <div className="mt-5 flex justify-between border-t border-zinc-200 pt-5">
             <span className="font-semibold text-zinc-950">Total dos produtos</span>
             <span className="font-semibold text-zinc-950">
@@ -171,7 +200,7 @@ export default async function OrderPage({ params }: OrderPageProps) {
             </span>
           </div>
           <p className="mt-3 text-xs leading-5 text-zinc-500">
-            Frete e pagamento aguardam confirmacao da loja.
+            O pagamento online cobre os produtos do pedido.
           </p>
           <Link
             href="/minha-conta"
