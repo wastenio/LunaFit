@@ -111,6 +111,12 @@ export function ProductForm({ product }: ProductFormProps) {
   const [sizes, setSizes] = useState(product?.sizes ?? '');
   const [colors, setColors] = useState(product?.colors ?? '');
   const [stock, setStock] = useState(String(product?.stock ?? 0));
+  const [packageWeightInGrams, setPackageWeightInGrams] = useState(
+    String(product?.packageWeightInGrams ?? 300)
+  );
+  const [packageWidthCm, setPackageWidthCm] = useState(String(product?.packageWidthCm ?? 20));
+  const [packageHeightCm, setPackageHeightCm] = useState(String(product?.packageHeightCm ?? 4));
+  const [packageLengthCm, setPackageLengthCm] = useState(String(product?.packageLengthCm ?? 28));
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const [isFeatured, setIsFeatured] = useState(product?.isFeatured ?? false);
   const [saving, setSaving] = useState(false);
@@ -203,6 +209,10 @@ export function ProductForm({ product }: ProductFormProps) {
           sizes,
           colors,
           stock,
+          packageWeightInGrams,
+          packageWidthCm,
+          packageHeightCm,
+          packageLengthCm,
           isActive,
           isFeatured,
         }),
@@ -442,6 +452,59 @@ export function ProductForm({ product }: ProductFormProps) {
           />
         </label>
       </div>
+
+      <section className="rounded-md border border-white/10 bg-white/[0.04] p-5">
+        <h2 className="text-base font-semibold text-white">Embalagem para frete</h2>
+        <div className="mt-5 grid gap-5 md:grid-cols-4">
+          <label className="block">
+            <span className="text-sm font-semibold text-zinc-200">Peso embalado (g)</span>
+            <input
+              type="number"
+              min="1"
+              value={packageWeightInGrams}
+              onChange={(event) => setPackageWeightInGrams(event.target.value)}
+              required
+              className="mt-2 w-full rounded-md border border-white/10 bg-white px-4 py-3 text-zinc-950 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-zinc-200">Largura (cm)</span>
+            <input
+              type="number"
+              min="1"
+              value={packageWidthCm}
+              onChange={(event) => setPackageWidthCm(event.target.value)}
+              required
+              className="mt-2 w-full rounded-md border border-white/10 bg-white px-4 py-3 text-zinc-950 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-zinc-200">Altura (cm)</span>
+            <input
+              type="number"
+              min="1"
+              value={packageHeightCm}
+              onChange={(event) => setPackageHeightCm(event.target.value)}
+              required
+              className="mt-2 w-full rounded-md border border-white/10 bg-white px-4 py-3 text-zinc-950 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-zinc-200">Comprimento (cm)</span>
+            <input
+              type="number"
+              min="1"
+              value={packageLengthCm}
+              onChange={(event) => setPackageLengthCm(event.target.value)}
+              required
+              className="mt-2 w-full rounded-md border border-white/10 bg-white px-4 py-3 text-zinc-950 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+            />
+          </label>
+        </div>
+      </section>
 
       <div className="flex flex-wrap gap-5">
         <label className="flex items-center gap-3 text-sm font-semibold text-zinc-200">

@@ -17,6 +17,10 @@ export const productPublicSelect = {
   sizes: true,
   colors: true,
   stock: true,
+  packageWeightInGrams: true,
+  packageWidthCm: true,
+  packageHeightCm: true,
+  packageLengthCm: true,
   isActive: true,
   isFeatured: true,
 } satisfies Prisma.ProductSelect;

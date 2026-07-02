@@ -23,6 +23,10 @@ model Product {
   sizes             String
   colors            String
   stock             Int              @default(0)
+  packageWeightInGrams Int           @default(300)
+  packageWidthCm    Int              @default(20)
+  packageHeightCm   Int              @default(4)
+  packageLengthCm   Int              @default(28)
   isActive          Boolean          @default(true)
   isFeatured        Boolean          @default(false)
   cartItems         CartItem[]
@@ -136,6 +140,20 @@ model Order {
   paymentRefundUpdatedAt     DateTime?
   subtotalInCents            Int
   shippingInCents            Int                    @default(0)
+  shippingProvider           String?
+  shippingServiceId          String?
+  shippingServiceName        String?
+  shippingCarrierName        String?
+  shippingDeliveryMinDays    Int?
+  shippingDeliveryMaxDays    Int?
+  shippingTrackingCode       String?
+  shippingTrackingUrl        String?
+  shippingLabelId            String?
+  shippingProtocol           String?
+  shippingStatus             String?
+  shippingPostedAt           DateTime?
+  shippingDeliveredAt        DateTime?
+  shippingUpdatedAt          DateTime?
   totalInCents               Int
   customerName               String
   customerEmail              String
@@ -160,6 +178,9 @@ model Order {
   @@index([paymentStatus, createdAt])
   @@index([mercadoPagoPaymentId])
   @@index([paymentRefundId])
+  @@index([shippingTrackingCode])
+  @@index([shippingLabelId])
+  @@index([shippingProtocol])
 }
 
 model OrderItem {

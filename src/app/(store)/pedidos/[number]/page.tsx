@@ -29,17 +29,11 @@ function getPaymentLinkMessage(value?: string | string[]) {
 
   switch (result) {
     case 'failed':
-      return 'Nao foi possivel gerar um novo link de pagamento agora. Tente novamente em instantes.';
+      return 'Nao foi possivel abrir o pagamento agora. Tente novamente em instantes.';
     case 'not-configured':
       return 'O pagamento online ainda nao esta configurado.';
-    case 'test-buyer-required':
-      return 'Configure o email da conta Comprador de teste do Mercado Pago para testar o pagamento.';
-    case 'test-buyer-invalid':
-      return 'Informe o email completo da conta Comprador de teste do Mercado Pago. Nao use apenas o usuario/login.';
-    case 'test-buyer-equals-customer':
-      return 'No Sandbox do Mercado Pago, o comprador de teste precisa ser diferente da conta usada no site.';
     case 'closed':
-      return 'Este pedido nao pode mais gerar um novo link de pagamento.';
+      return 'Este pedido nao pode mais receber pagamento.';
     default:
       return null;
   }
@@ -117,7 +111,7 @@ export default async function OrderPage({ params, searchParams }: OrderPageProps
               type="submit"
               className="mt-6 inline-flex rounded-md bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
             >
-              Concluir pagamento
+              Abrir pagamento
             </button>
           </form>
         ) : null}
@@ -218,6 +212,40 @@ export default async function OrderPage({ params, searchParams }: OrderPageProps
 
           <div className="mt-6 border-t border-zinc-200 pt-6">
           <h2 className="font-semibold text-zinc-950">Entrega</h2>
+          {order.shippingCarrierName || order.shippingServiceName ? (
+            <p className="mt-3 text-sm leading-6 text-zinc-600">
+              {order.shippingCarrierName}
+              {order.shippingServiceName ? ` - ${order.shippingServiceName}` : ''}
+              {order.shippingDeliveryMaxDays !== null ? (
+                <>
+                  <br />
+                  Prazo estimado: {order.shippingDeliveryMinDays ?? order.shippingDeliveryMaxDays}
+                  {order.shippingDeliveryMinDays !== order.shippingDeliveryMaxDays
+                    ? ` a ${order.shippingDeliveryMaxDays}`
+                    : ''}{' '}
+                  dias uteis
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {order.shippingTrackingCode ? (
+            <p className="mt-3 border-t border-zinc-200 pt-3 text-sm leading-6 text-zinc-600">
+              Rastreio: <span className="font-semibold">{order.shippingTrackingCode}</span>
+              {order.shippingTrackingUrl ? (
+                <>
+                  <br />
+                  <a
+                    href={order.shippingTrackingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-rose-700 hover:text-zinc-950"
+                  >
+                    Acompanhar entrega
+                  </a>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           <p className="mt-3 text-sm leading-6 text-zinc-600">
             {order.customerName}
             <br />
@@ -234,11 +262,23 @@ export default async function OrderPage({ params, searchParams }: OrderPageProps
           <div className="mt-5 flex justify-between border-t border-zinc-200 pt-5">
             <span className="font-semibold text-zinc-950">Total dos produtos</span>
             <span className="font-semibold text-zinc-950">
+              {formatCents(order.subtotalInCents)}
+            </span>
+          </div>
+          <div className="mt-3 flex justify-between text-sm">
+            <span className="text-zinc-600">Frete</span>
+            <span className="font-semibold text-zinc-950">
+              {formatCents(order.shippingInCents)}
+            </span>
+          </div>
+          <div className="mt-4 flex justify-between border-t border-zinc-200 pt-4">
+            <span className="font-semibold text-zinc-950">Total</span>
+            <span className="font-semibold text-zinc-950">
               {formatCents(order.totalInCents)}
             </span>
           </div>
           <p className="mt-3 text-xs leading-5 text-zinc-500">
-            O pagamento online cobre os produtos do pedido.
+            O pagamento online cobre produtos e frete do pedido.
           </p>
           <Link
             href="/minha-conta"

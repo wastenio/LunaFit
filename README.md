@@ -16,7 +16,8 @@ Producao: <https://lunafit-azure.vercel.app>
 - Vercel Blob para imagens de produtos
 - Auth.js, Google OAuth e autenticacao por email/senha
 - Resend para emails transacionais
-- Mercado Pago Checkout Pro para pagamentos online
+- Mercado Pago Payment Brick para Pix, cartao, boleto e pagamentos online
+- Melhor Envio para cotacao de frete com Correios e transportadoras
 
 ## Estrutura
 
@@ -44,8 +45,8 @@ npm install
 2. Crie o arquivo `.env.local` a partir de `.env.example` e configure:
 
 ```bash
-DATABASE_URL="postgresql://usuario:senha@host/banco?sslmode=require"
-DATABASE_URL_UNPOOLED="postgresql://usuario:senha@host/banco?sslmode=require"
+DATABASE_URL="postgresql://usuario:senha@host/banco?sslmode=require&connect_timeout=20&pool_timeout=30"
+DATABASE_URL_UNPOOLED="postgresql://usuario:senha@host/banco?sslmode=require&connect_timeout=20&pool_timeout=30"
 ADMIN_PASSWORD="sua-senha-forte"
 AUTH_SECRET="uma-string-longa-e-aleatoria"
 AUTH_GOOGLE_ID="client-id-do-google"
@@ -57,6 +58,12 @@ MERCADO_PAGO_ACCESS_TOKEN="access-token-do-mercado-pago"
 MERCADO_PAGO_WEBHOOK_SECRET="assinatura-secreta-do-webhook"
 NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY="public-key-do-mercado-pago"
 NEXT_PUBLIC_APP_URL="https://lunafit-azure.vercel.app"
+MELHOR_ENVIO_BASE_URL="https://sandbox.melhorenvio.com.br"
+MELHOR_ENVIO_ACCESS_TOKEN="token-oauth-do-melhor-envio"
+MELHOR_ENVIO_ORIGIN_POSTAL_CODE="60000000"
+MELHOR_ENVIO_USER_AGENT="LunaFit (contato@seudominio.com)"
+MELHOR_ENVIO_SERVICES="1,2,18"
+MELHOR_ENVIO_WEBHOOK_SECRET="secret-do-aplicativo-melhor-envio"
 NEXT_PUBLIC_STORE_NAME="LunaFit"
 NEXT_PUBLIC_STORE_INSTAGRAM_URL="https://instagram.com/sua-loja"
 NEXT_PUBLIC_STORE_WHATSAPP_NUMBER="5585999999999"
@@ -120,16 +127,16 @@ cada mudanca de status operacional ou financeiro.
 
 ### Pagamentos Mercado Pago
 
-O checkout usa Mercado Pago Checkout Pro. O cliente finaliza os dados de entrega,
-o pedido e reservado no banco e ele e redirecionado para o ambiente seguro do Mercado
-Pago. O webhook atualiza o status financeiro do pedido automaticamente.
+O checkout usa Mercado Pago Payment Brick. O cliente finaliza os dados de entrega,
+calcula e escolhe o frete, o pedido e reservado no banco e ele escolhe Pix, cartao
+ou boleto na pagina de pagamento da LunaFit. O pagamento e criado pela API do
+Mercado Pago e o webhook atualiza o status financeiro do pedido automaticamente.
 
 Configure na Vercel e no `.env.local`:
 
 ```bash
 MERCADO_PAGO_ACCESS_TOKEN=""
 MERCADO_PAGO_WEBHOOK_SECRET=""
-MERCADO_PAGO_TEST_BUYER_EMAIL=""
 NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=""
 NEXT_PUBLIC_APP_URL="https://lunafit-azure.vercel.app"
 ```
@@ -144,17 +151,46 @@ Use credenciais de teste primeiro. Em producao, troque as variaveis por credenci
 produtivas e mantenha `MERCADO_PAGO_ACCESS_TOKEN` e `MERCADO_PAGO_WEBHOOK_SECRET`
 como variaveis confidenciais.
 
-Para testar em Sandbox, use a credencial de uma conta Vendedor de teste no
-`MERCADO_PAGO_ACCESS_TOKEN` e informe em `MERCADO_PAGO_TEST_BUYER_EMAIL` o e-mail
-da conta Comprador de teste criada no Mercado Pago. O comprador de teste precisa
-ser diferente do vendedor das credenciais e diferente da conta usada para entrar
-no site durante o teste. Use o e-mail completo da conta de teste, nao apenas o
-usuario/login, e nao use seu e-mail real nessa variavel.
+Para testar em Sandbox, use as credenciais `TEST` da aplicacao Mercado Pago no
+`MERCADO_PAGO_ACCESS_TOKEN` e em `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY`. Use dados
+de teste aceitos pelo Mercado Pago para cartoes, Pix e boleto. Nao use sua conta
+real ou a conta Vendedor para pagar um pedido de teste.
 
 No painel admin, pedidos com pagamento aprovado e ID do Mercado Pago podem ser
 reembolsados. O reembolso solicita o estorno total pela API do Mercado Pago,
 atualiza o status financeiro, cancela o pedido quando ele ainda nao foi concluido,
 devolve o estoque e notifica o cliente.
+
+### Frete e entrega
+
+O frete usa a API do Melhor Envio para cotar Correios e transportadoras em tempo
+real. Cada produto possui peso e dimensoes de embalagem no painel admin; mantenha
+esses dados reais para que a cotacao seja confiavel.
+
+Configure na Vercel e no `.env.local`:
+
+```bash
+MELHOR_ENVIO_BASE_URL="https://sandbox.melhorenvio.com.br"
+MELHOR_ENVIO_ACCESS_TOKEN=""
+MELHOR_ENVIO_ORIGIN_POSTAL_CODE=""
+MELHOR_ENVIO_USER_AGENT="LunaFit (contato@seudominio.com)"
+MELHOR_ENVIO_SERVICES=""
+MELHOR_ENVIO_WEBHOOK_SECRET=""
+```
+
+Use `https://sandbox.melhorenvio.com.br` com token de sandbox nos testes e
+`https://www.melhorenvio.com.br` com token produtivo quando a loja estiver pronta.
+O `MELHOR_ENVIO_SERVICES` e opcional; deixe vazio para retornar os servicos
+habilitados no painel Melhor Envio.
+
+URL do webhook de entrega:
+
+```text
+https://lunafit-azure.vercel.app/api/webhooks/melhor-envio
+```
+
+No admin de pedidos, o responsavel pode salvar transportadora, codigo e link de
+rastreio. Ao salvar, o cliente recebe notificacao e o pedido passa para enviado.
 
 ## Catalogo de demonstracao
 

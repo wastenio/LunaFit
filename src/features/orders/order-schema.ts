@@ -9,6 +9,7 @@ export type CheckoutInput = {
   city: string;
   state: string;
   notes: string | null;
+  shippingServiceId: string;
 };
 
 type CheckoutResult =
@@ -30,6 +31,7 @@ export function parseCheckoutInput(source: Record<string, unknown>): CheckoutRes
   const city = readText(source, 'city');
   const state = readText(source, 'state').toUpperCase();
   const notes = readText(source, 'notes') || null;
+  const shippingServiceId = readText(source, 'shippingServiceId');
 
   if (customerName.length < 3) {
     return { success: false, error: 'Informe o nome completo.' };
@@ -66,6 +68,10 @@ export function parseCheckoutInput(source: Record<string, unknown>): CheckoutRes
     return { success: false, error: 'Complete bairro, cidade e UF.' };
   }
 
+  if (!shippingServiceId) {
+    return { success: false, error: 'Calcule e selecione uma opcao de frete.' };
+  }
+
   return {
     success: true,
     data: {
@@ -79,6 +85,7 @@ export function parseCheckoutInput(source: Record<string, unknown>): CheckoutRes
       city,
       state,
       notes,
+      shippingServiceId,
     },
   };
 }

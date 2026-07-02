@@ -14,6 +14,10 @@ export type ProductInput = {
   sizes: string;
   colors: string;
   stock: number;
+  packageWeightInGrams: number;
+  packageWidthCm: number;
+  packageHeightCm: number;
+  packageLengthCm: number;
   isActive: boolean;
   isFeatured: boolean;
 };
@@ -119,6 +123,10 @@ export function parseProductInput(source: Record<string, unknown> | FormData): P
   const promoStartsAt = parseDate(rawPromoStartsAt);
   const promoEndsAt = parseDate(rawPromoEndsAt);
   const stock = parseInteger(readValue(source, 'stock')) ?? 0;
+  const packageWeightInGrams = parseInteger(readValue(source, 'packageWeightInGrams')) ?? 0;
+  const packageWidthCm = parseInteger(readValue(source, 'packageWidthCm')) ?? 0;
+  const packageHeightCm = parseInteger(readValue(source, 'packageHeightCm')) ?? 0;
+  const packageLengthCm = parseInteger(readValue(source, 'packageLengthCm')) ?? 0;
   const isActive = asBoolean(readValue(source, 'isActive'));
   const isFeatured = asBoolean(readValue(source, 'isFeatured'));
 
@@ -186,6 +194,21 @@ export function parseProductInput(source: Record<string, unknown> | FormData): P
     errors.stock = 'O estoque nao pode ser negativo.';
   }
 
+  if (packageWeightInGrams <= 0 || packageWeightInGrams > 30_000) {
+    errors.packageWeightInGrams = 'Informe o peso embalado em gramas.';
+  }
+
+  if (
+    packageWidthCm <= 0 ||
+    packageHeightCm <= 0 ||
+    packageLengthCm <= 0 ||
+    packageWidthCm > 200 ||
+    packageHeightCm > 200 ||
+    packageLengthCm > 200
+  ) {
+    errors.packageDimensions = 'Informe dimensoes validas em centimetros.';
+  }
+
   if (Object.keys(errors).length > 0 || priceInCents === null) {
     return {
       success: false,
@@ -209,6 +232,10 @@ export function parseProductInput(source: Record<string, unknown> | FormData): P
       sizes,
       colors,
       stock,
+      packageWeightInGrams,
+      packageWidthCm,
+      packageHeightCm,
+      packageLengthCm,
       isActive,
       isFeatured,
     },

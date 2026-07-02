@@ -7,6 +7,7 @@ import { refundMercadoPagoPayment } from '@/lib/mercado-pago';
 import { getPrisma } from '@/lib/prisma';
 import { getPaymentNotification } from '@/features/payments/payment-notification';
 import { mapMercadoPagoRefundStatus } from '@/features/payments/payment-status';
+import { getTrackingNotification } from '@/features/shipping/shipping-notification';
 import { getOrderNotification } from './order-notification';
 import {
   canTransitionOrderStatus,
@@ -24,8 +25,17 @@ type RefundActionResult =
   | 'not-found'
   | 'failed';
 
+type ShippingActionResult =
+  | 'success'
+  | 'invalid'
+  | 'not-found';
+
 function getAdminOrderPath(number: string, result: RefundActionResult) {
   return `/admin/pedidos/${encodeURIComponent(number)}?refund=${result}`;
+}
+
+function getAdminShippingPath(number: string, result: ShippingActionResult) {
+  return `/admin/pedidos/${encodeURIComponent(number)}?shipping=${result}`;
 }
 
 function amountToCents(amount?: number | null) {
@@ -38,6 +48,24 @@ function parseRefundDate(value?: string) {
 
 function getPaymentEventStatus(status: string) {
   return `PAYMENT_${status}`;
+}
+
+function readText(formData: FormData, key: string) {
+  return String(formData.get(key) ?? '').trim();
+}
+
+function parseTrackingUrl(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateOrderStatusAction(number: string, formData: FormData) {
@@ -101,6 +129,82 @@ export async function updateOrderStatusAction(number: string, formData: FormData
   revalidatePath('/notificacoes');
   revalidatePath('/', 'layout');
   revalidatePath(`/pedidos/${number}`);
+}
+
+export async function updateOrderShippingAction(number: string, formData: FormData) {
+  await requireAdmin();
+
+  const trackingCode = readText(formData, 'shippingTrackingCode');
+  const rawTrackingUrl = readText(formData, 'shippingTrackingUrl');
+  const carrierName = readText(formData, 'shippingCarrierName');
+  const trackingUrl = parseTrackingUrl(rawTrackingUrl);
+
+  if (trackingCode.length < 4 || trackingCode.length > 80 || (rawTrackingUrl && !trackingUrl)) {
+    redirect(getAdminShippingPath(number, 'invalid'));
+  }
+
+  const prisma = getPrisma();
+
+  const order = await prisma.order.findUnique({
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      shippingCarrierName: true,
+      userId: true,
+    },
+    where: { number },
+  });
+
+  if (!order) {
+    redirect('/admin/pedidos?shipping=not-found');
+  }
+
+  const shouldMarkAsShipped = order.status !== 'CANCELLED' && order.status !== 'COMPLETED';
+  const notification = getTrackingNotification({
+    carrierName: carrierName || order.shippingCarrierName,
+    orderNumber: order.number,
+    trackingCode,
+    trackingUrl,
+  });
+
+  await prisma.$transaction(async (transaction) => {
+    const updatedOrder = await transaction.order.update({
+      data: {
+        shippingCarrierName: carrierName || order.shippingCarrierName,
+        shippingStatus: 'tracking_registered',
+        shippingTrackingCode: trackingCode,
+        shippingTrackingUrl: trackingUrl,
+        shippingUpdatedAt: new Date(),
+        status: shouldMarkAsShipped ? 'SHIPPED' : order.status,
+      },
+      where: { id: order.id },
+    });
+
+    await transaction.orderStatusEvent.create({
+      data: {
+        orderId: updatedOrder.id,
+        status: shouldMarkAsShipped ? 'SHIPPED' : 'SHIPPING_TRACKING_UPDATED',
+        ...notification,
+      },
+    });
+    await transaction.customerNotification.create({
+      data: {
+        orderId: updatedOrder.id,
+        userId: updatedOrder.userId,
+        ...notification,
+      },
+    });
+  });
+
+  revalidatePath('/admin/pedidos');
+  revalidatePath(`/admin/pedidos/${number}`);
+  revalidatePath('/admin', 'layout');
+  revalidatePath('/minha-conta');
+  revalidatePath('/notificacoes');
+  revalidatePath('/', 'layout');
+  revalidatePath(`/pedidos/${number}`);
+  redirect(getAdminShippingPath(number, 'success'));
 }
 
 export async function refundOrderPaymentAction(number: string, formData: FormData) {

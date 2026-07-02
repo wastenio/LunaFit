@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { formatCents } from '@/lib/money';
 import {
   refundOrderPaymentAction,
+  updateOrderShippingAction,
   updateOrderStatusAction,
 } from '@/features/orders/actions';
 import { getOrderForAdmin } from '@/features/orders/order-data';
@@ -22,6 +23,7 @@ type AdminOrderPageProps = {
   }>;
   searchParams: Promise<{
     refund?: string | string[];
+    shipping?: string | string[];
   }>;
 };
 
@@ -69,6 +71,25 @@ function getRefundMessage(value?: string | string[]) {
   }
 }
 
+function getShippingMessage(value?: string | string[]) {
+  const result = Array.isArray(value) ? value[0] : value;
+
+  switch (result) {
+    case 'success':
+      return {
+        tone: 'success',
+        text: 'Rastreio salvo e cliente notificado.',
+      };
+    case 'invalid':
+      return {
+        tone: 'error',
+        text: 'Informe um codigo de rastreio valido e uma URL https, se preencher o link.',
+      };
+    default:
+      return null;
+  }
+}
+
 export default async function AdminOrderPage({ params, searchParams }: AdminOrderPageProps) {
   const { number } = await params;
   const resolvedSearchParams = await searchParams;
@@ -79,6 +100,7 @@ export default async function AdminOrderPage({ params, searchParams }: AdminOrde
   }
 
   const updateStatus = updateOrderStatusAction.bind(null, order.number);
+  const updateShipping = updateOrderShippingAction.bind(null, order.number);
   const refundPayment = refundOrderPaymentAction.bind(null, order.number);
   const availableStatuses = getAvailableOrderStatuses(order.status);
   const isTerminal = availableStatuses.length === 1;
@@ -87,6 +109,7 @@ export default async function AdminOrderPage({ params, searchParams }: AdminOrde
     order.paymentStatus === 'APPROVED' &&
     Boolean(order.mercadoPagoPaymentId);
   const refundMessage = getRefundMessage(resolvedSearchParams.refund);
+  const shippingMessage = getShippingMessage(resolvedSearchParams.shipping);
 
   return (
     <section>
@@ -104,6 +127,17 @@ export default async function AdminOrderPage({ params, searchParams }: AdminOrde
           }`}
         >
           {refundMessage.text}
+        </div>
+      ) : null}
+      {shippingMessage ? (
+        <div
+          className={`mt-5 border px-4 py-3 text-sm ${
+            shippingMessage.tone === 'success'
+              ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'
+              : 'border-rose-400/30 bg-rose-400/10 text-rose-100'
+          }`}
+        >
+          {shippingMessage.text}
         </div>
       ) : null}
       <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -261,9 +295,99 @@ export default async function AdminOrderPage({ params, searchParams }: AdminOrde
             </p>
           ) : null}
           </div>
-          <div className="mt-5 flex justify-between border-t border-white/10 pt-5">
-            <span className="font-semibold text-white">Total</span>
-            <span className="font-semibold text-white">{formatCents(order.totalInCents)}</span>
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <p className="text-sm font-semibold text-white">Frete e rastreio</p>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              {order.shippingCarrierName || 'Transportadora nao definida'}
+              {order.shippingServiceName ? ` - ${order.shippingServiceName}` : ''}
+              {order.shippingDeliveryMaxDays !== null ? (
+                <>
+                  <br />
+                  Prazo: {order.shippingDeliveryMinDays ?? order.shippingDeliveryMaxDays}
+                  {order.shippingDeliveryMinDays !== order.shippingDeliveryMaxDays
+                    ? ` a ${order.shippingDeliveryMaxDays}`
+                    : ''}{' '}
+                  dias uteis
+                </>
+              ) : null}
+              <br />
+              Valor: {formatCents(order.shippingInCents)}
+              {order.shippingTrackingCode ? (
+                <>
+                  <br />
+                  Rastreio: {order.shippingTrackingCode}
+                </>
+              ) : null}
+              {order.shippingTrackingUrl ? (
+                <>
+                  <br />
+                  <a
+                    href={order.shippingTrackingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-rose-300 hover:text-white"
+                  >
+                    Abrir rastreio
+                  </a>
+                </>
+              ) : null}
+            </p>
+
+            <form action={updateShipping} className="mt-5 space-y-4">
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                  Transportadora
+                </span>
+                <input
+                  name="shippingCarrierName"
+                  defaultValue={order.shippingCarrierName ?? ''}
+                  className="mt-2 w-full rounded-md border border-white/15 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-rose-400"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                  Codigo de rastreio
+                </span>
+                <input
+                  name="shippingTrackingCode"
+                  defaultValue={order.shippingTrackingCode ?? ''}
+                  required
+                  className="mt-2 w-full rounded-md border border-white/15 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-rose-400"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                  Link de rastreio
+                </span>
+                <input
+                  name="shippingTrackingUrl"
+                  type="url"
+                  defaultValue={order.shippingTrackingUrl ?? ''}
+                  placeholder="https://..."
+                  className="mt-2 w-full rounded-md border border-white/15 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-rose-400"
+                />
+              </label>
+              <button
+                type="submit"
+                className="w-full rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-zinc-950"
+              >
+                Salvar rastreio
+              </button>
+            </form>
+          </div>
+          <div className="mt-5 border-t border-white/10 pt-5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-zinc-300">Produtos</span>
+              <span className="font-semibold text-white">{formatCents(order.subtotalInCents)}</span>
+            </div>
+            <div className="mt-3 flex justify-between">
+              <span className="text-zinc-300">Frete</span>
+              <span className="font-semibold text-white">{formatCents(order.shippingInCents)}</span>
+            </div>
+            <div className="mt-4 flex justify-between border-t border-white/10 pt-4">
+              <span className="font-semibold text-white">Total</span>
+              <span className="font-semibold text-white">{formatCents(order.totalInCents)}</span>
+            </div>
           </div>
         </aside>
       </div>

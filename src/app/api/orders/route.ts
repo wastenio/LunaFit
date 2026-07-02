@@ -1,46 +1,22 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getCustomerSession } from '@/lib/customer-auth';
-import {
-  createMercadoPagoCheckoutPreference,
-  getMercadoPagoCheckoutUrl,
-  isMercadoPagoConfigured,
-} from '@/lib/mercado-pago';
+import { isMercadoPagoConfigured } from '@/lib/mercado-pago';
 import { getPrisma } from '@/lib/prisma';
 import { readAnalyticsIdentity } from '@/features/analytics/analytics-server';
 import { parseCheckoutInput } from '@/features/orders/order-schema';
 import { getPaymentNotification } from '@/features/payments/payment-notification';
 import { getCurrentPriceInCents } from '@/features/products/product-promotion';
+import { ShippingQuoteError } from '@/features/shipping/melhor-envio';
+import {
+  findShippingQuoteOption,
+  getShippingQuotesForCart,
+} from '@/features/shipping/shipping-quotes';
+import type { ShippingQuoteOption } from '@/features/shipping/shipping-types';
 
 function createOrderNumber() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `LF-${date}-${randomUUID().slice(0, 8).toUpperCase()}`;
-}
-
-async function releaseOrderReservation(number: string) {
-  const prisma = getPrisma();
-
-  await prisma.$transaction(async (transaction) => {
-    const order = await transaction.order.findUnique({
-      include: { items: true },
-      where: { number },
-    });
-
-    if (!order) {
-      return;
-    }
-
-    for (const item of order.items) {
-      if (item.productId) {
-        await transaction.product.updateMany({
-          data: { stock: { increment: item.quantity } },
-          where: { id: item.productId },
-        });
-      }
-    }
-
-    await transaction.order.delete({ where: { id: order.id } });
-  });
 }
 
 export async function POST(request: Request) {
@@ -71,6 +47,43 @@ export async function POST(request: Request) {
   }
 
   const prisma = getPrisma();
+  const { shippingServiceId, ...checkoutData } = parsed.data;
+  let selectedShipping: ShippingQuoteOption | null = null;
+
+  try {
+    const shippingOptions = await getShippingQuotesForCart(
+      session.user.id,
+      checkoutData.postalCode
+    );
+    selectedShipping = findShippingQuoteOption(shippingOptions, shippingServiceId);
+
+    if (!selectedShipping) {
+      return NextResponse.json(
+        { error: 'Selecione uma opcao de frete valida para este CEP.' },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    if (error instanceof ShippingQuoteError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error('[shipping] order quote failed', {
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+
+    return NextResponse.json(
+      { error: 'Nao foi possivel confirmar o frete agora.' },
+      { status: 500 }
+    );
+  }
+
+  if (!selectedShipping) {
+    return NextResponse.json(
+      { error: 'Selecione uma opcao de frete valida para este CEP.' },
+      { status: 400 }
+    );
+  }
 
   try {
     const createdOrder = await prisma.$transaction(async (transaction) => {
@@ -129,7 +142,7 @@ export async function POST(request: Request) {
 
       const createdOrder = await transaction.order.create({
         data: {
-          ...parsed.data,
+          ...checkoutData,
           number: createOrderNumber(),
           status: 'PENDING',
           userId: session.user.id,
@@ -137,8 +150,16 @@ export async function POST(request: Request) {
           paymentProvider: 'MERCADO_PAGO',
           paymentStatus: 'PENDING',
           subtotalInCents,
-          shippingInCents: 0,
-          totalInCents: subtotalInCents,
+          shippingCarrierName: selectedShipping.carrierName,
+          shippingDeliveryMaxDays: selectedShipping.deliveryMaxDays,
+          shippingDeliveryMinDays: selectedShipping.deliveryMinDays,
+          shippingInCents: selectedShipping.priceInCents,
+          shippingProvider: selectedShipping.provider,
+          shippingServiceId: selectedShipping.serviceId,
+          shippingServiceName: selectedShipping.serviceName,
+          shippingStatus: 'quoted',
+          shippingUpdatedAt: new Date(),
+          totalInCents: subtotalInCents + selectedShipping.priceInCents,
           items: {
             create: items,
           },
@@ -172,93 +193,27 @@ export async function POST(request: Request) {
             userId: session.user.id,
             path: '/checkout',
             orderId: createdOrder.id,
-            valueInCents: subtotalInCents,
+            valueInCents: createdOrder.totalInCents,
           },
         });
       }
 
       await transaction.user.update({
-        data: { phone: parsed.data.phone },
+        data: { phone: checkoutData.phone },
         where: { id: session.user.id },
+      });
+      await transaction.cartItem.deleteMany({
+        where: { userId: session.user.id },
       });
 
       return createdOrder;
     });
 
-    let checkoutUrl = '';
-
-    try {
-      const preference = await createMercadoPagoCheckoutPreference({
-        order: createdOrder,
-        items: createdOrder.items,
-        requestUrl: request.url,
-      });
-      checkoutUrl = getMercadoPagoCheckoutUrl(preference) || '';
-
-      if (!preference.id || !checkoutUrl) {
-        throw new Error('PREFERENCE_WITHOUT_CHECKOUT_URL');
-      }
-
-      await prisma.$transaction([
-        prisma.order.update({
-          data: {
-            paymentInitPoint: checkoutUrl,
-            paymentPreferenceId: preference.id,
-          },
-          where: { id: createdOrder.id },
-        }),
-        prisma.cartItem.deleteMany({
-          where: { userId: session.user.id },
-        }),
-      ]);
-    } catch (error) {
-      await releaseOrderReservation(createdOrder.number);
-      console.error('[mercado-pago] checkout preference failed', {
-        orderNumber: createdOrder.number,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      if (
-        error instanceof Error &&
-        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_REQUIRED'
-      ) {
-        return NextResponse.json(
-          { error: 'Configure o email da conta Comprador de teste do Mercado Pago.' },
-          { status: 503 }
-        );
-      }
-
-      if (
-        error instanceof Error &&
-        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_INVALID'
-      ) {
-        return NextResponse.json(
-          { error: 'Informe um email valido da conta Comprador de teste do Mercado Pago.' },
-          { status: 503 }
-        );
-      }
-
-      if (
-        error instanceof Error &&
-        error.message === 'MERCADO_PAGO_TEST_BUYER_EMAIL_EQUALS_CUSTOMER'
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              'No Sandbox do Mercado Pago, o comprador de teste deve ser diferente da conta usada no site.',
-          },
-          { status: 503 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: 'Nao foi possivel iniciar o pagamento agora. Tente novamente.' },
-        { status: 502 }
-      );
-    }
-
     return NextResponse.json(
-      { number: createdOrder.number, checkoutUrl },
+      {
+        number: createdOrder.number,
+        checkoutUrl: `/pagamento/${encodeURIComponent(createdOrder.number)}`,
+      },
       { status: 201 }
     );
   } catch (error) {
